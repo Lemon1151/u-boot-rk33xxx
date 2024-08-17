@@ -44,7 +44,6 @@ struct pca9450_vrange {
  * @ranges:	pointer to ranges of regulator voltages and matching register
  *		values
  * @numranges:	number of voltage ranges pointed by ranges
- * @dvs:	whether the voltage can be changed when regulator is enabled
  */
 struct pca9450_plat {
 	const char		*name;
@@ -54,7 +53,6 @@ struct pca9450_plat {
 	u8			volt_mask;
 	struct pca9450_vrange	*ranges;
 	unsigned int		numranges;
-	bool			dvs;
 };
 
 #define PCA_RANGE(_min, _vstep, _sel_low, _sel_hi) \
@@ -63,11 +61,11 @@ struct pca9450_plat {
 	.min_sel = (_sel_low), .max_sel = (_sel_hi), \
 }
 
-#define PCA_DATA(_name, enreg, enmask, vreg, vmask, _range, _dvs) \
+#define PCA_DATA(_name, enreg, enmask, vreg, vmask, _range) \
 { \
 	.name = (_name), .enable_reg = (enreg), .enablemask = (enmask), \
 	.volt_reg = (vreg), .volt_mask = (vmask), .ranges = (_range), \
-	.numranges = ARRAY_SIZE(_range), .dvs = (_dvs), \
+	.numranges = ARRAY_SIZE(_range) \
 }
 
 static struct pca9450_vrange pca9450_buck123_vranges[] = {
@@ -107,39 +105,39 @@ static struct pca9450_plat pca9450_reg_data[] = {
 	/* Bucks 1-3 which support dynamic voltage scaling */
 	PCA_DATA("BUCK1", PCA9450_BUCK1CTRL, HW_STATE_CONTROL,
 		 PCA9450_BUCK1OUT_DVS0, PCA9450_DVS_BUCK_RUN_MASK,
-		 pca9450_buck123_vranges, true),
+		 pca9450_buck123_vranges),
 	PCA_DATA("BUCK2", PCA9450_BUCK2CTRL, HW_STATE_CONTROL,
 		 PCA9450_BUCK2OUT_DVS0, PCA9450_DVS_BUCK_RUN_MASK,
-		 pca9450_buck123_vranges, true),
+		 pca9450_buck123_vranges),
 	PCA_DATA("BUCK3", PCA9450_BUCK3CTRL, HW_STATE_CONTROL,
 		 PCA9450_BUCK3OUT_DVS0, PCA9450_DVS_BUCK_RUN_MASK,
-		 pca9450_buck123_vranges, true),
+		 pca9450_buck123_vranges),
 	/* Bucks 4-6 which do not support dynamic voltage scaling */
 	PCA_DATA("BUCK4", PCA9450_BUCK4CTRL, HW_STATE_CONTROL,
 		 PCA9450_BUCK4OUT, PCA9450_DVS_BUCK_RUN_MASK,
-		 pca9450_buck456_vranges, false),
+		 pca9450_buck456_vranges),
 	PCA_DATA("BUCK5", PCA9450_BUCK5CTRL, HW_STATE_CONTROL,
 		 PCA9450_BUCK5OUT, PCA9450_DVS_BUCK_RUN_MASK,
-		 pca9450_buck456_vranges, false),
+		 pca9450_buck456_vranges),
 	PCA_DATA("BUCK6", PCA9450_BUCK6CTRL, HW_STATE_CONTROL,
 		 PCA9450_BUCK6OUT, PCA9450_DVS_BUCK_RUN_MASK,
-		 pca9450_buck456_vranges, false),
+		 pca9450_buck456_vranges),
 	/* LDOs */
 	PCA_DATA("LDO1", PCA9450_LDO1CTRL, HW_STATE_CONTROL,
 		 PCA9450_LDO1CTRL, PCA9450_LDO12_MASK,
-		 pca9450_ldo1_vranges, false),
+		 pca9450_ldo1_vranges),
 	PCA_DATA("LDO2", PCA9450_LDO2CTRL, HW_STATE_CONTROL,
 		 PCA9450_LDO2CTRL, PCA9450_LDO12_MASK,
-		 pca9450_ldo2_vranges, false),
+		 pca9450_ldo2_vranges),
 	PCA_DATA("LDO3", PCA9450_LDO3CTRL, HW_STATE_CONTROL,
 		 PCA9450_LDO3CTRL, PCA9450_LDO34_MASK,
-		 pca9450_ldo34_vranges, false),
+		 pca9450_ldo34_vranges),
 	PCA_DATA("LDO4", PCA9450_LDO4CTRL, HW_STATE_CONTROL,
 		 PCA9450_LDO4CTRL, PCA9450_LDO34_MASK,
-		 pca9450_ldo34_vranges, false),
+		 pca9450_ldo34_vranges),
 	PCA_DATA("LDO5", PCA9450_LDO5CTRL_H, HW_STATE_CONTROL,
 		 PCA9450_LDO5CTRL_H, PCA9450_LDO5_MASK,
-		 pca9450_ldo5_vranges, false),
+		 pca9450_ldo5_vranges),
 };
 
 static int vrange_find_value(struct pca9450_vrange *r, unsigned int sel,
@@ -246,20 +244,6 @@ static int pca9450_set_value(struct udevice *dev, int uvolt)
 	unsigned int sel;
 	int i, found = 0;
 
-	/*
-	 * An under/overshooting may occur if voltage is changed for other
-	 * regulators but buck 1,2,3 or 4 when regulator is enabled. Prevent
-	 * change to protect the HW
-	 */
-	if (!plat->dvs)
-		if (pca9450_get_enable(dev)) {
-			/* If the value is already set, skip the warning. */
-			if (pca9450_get_value(dev) == uvolt)
-				return 0;
-			pr_err("Only DVS bucks can be changed when enabled\n");
-			return -EINVAL;
-		}
-
 	for (i = 0; i < plat->numranges; i++) {
 		struct pca9450_vrange *r = &plat->ranges[i];
 
@@ -292,7 +276,8 @@ static int pca9450_regulator_probe(struct udevice *dev)
 
 	type = dev_get_driver_data(dev_get_parent(dev));
 
-	if (type != NXP_CHIP_TYPE_PCA9450A && type != NXP_CHIP_TYPE_PCA9450BC) {
+	if (type != NXP_CHIP_TYPE_PCA9450A && type != NXP_CHIP_TYPE_PCA9450BC &&
+	    type != NXP_CHIP_TYPE_PCA9451A) {
 		debug("Unknown PMIC type\n");
 		return -EINVAL;
 	}
@@ -304,6 +289,14 @@ static int pca9450_regulator_probe(struct udevice *dev)
 		/* PCA9450B/PCA9450C uses BUCK1 and BUCK3 in dual-phase */
 		if (type == NXP_CHIP_TYPE_PCA9450BC &&
 		    !strcmp(pca9450_reg_data[i].name, "BUCK3")) {
+			continue;
+		}
+
+		/* PCA9451A uses BUCK3 in dual-phase and don't have LDO2 and LDO3 */
+		if (type == NXP_CHIP_TYPE_PCA9451A &&
+		    (!strcmp(pca9450_reg_data[i].name, "BUCK3") ||
+		    !strcmp(pca9450_reg_data[i].name, "LDO2") ||
+		    !strcmp(pca9450_reg_data[i].name, "LDO3"))) {
 			continue;
 		}
 

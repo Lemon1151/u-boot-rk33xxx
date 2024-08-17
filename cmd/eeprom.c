@@ -200,10 +200,10 @@ int eeprom_write(unsigned dev_addr, unsigned offset,
 	return ret;
 }
 
-static int parse_numeric_param(char *str)
+static long parse_numeric_param(char *str)
 {
 	char *endptr;
-	int value = simple_strtol(str, &endptr, 16);
+	long value = simple_strtol(str, &endptr, 16);
 
 	return (*endptr != '\0') ? -1 : value;
 }
@@ -435,4 +435,4 @@ U_BOOT_CMD(
 	"The values which can be provided with the -l option are:\n"
 	CONFIG_EEPROM_LAYOUT_HELP_STRING"\n"
 #endif
-)
+);
