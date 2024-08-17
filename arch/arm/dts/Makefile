@@ -155,6 +155,7 @@ dtb-$(CONFIG_ROCKCHIP_RK3399) += \
 	rk3399-orangepi.dtb \
 	rk3399-pinebook-pro.dtb \
 	rk3399-puma-haikou.dtb \
+	rk3399-r08.dtb \
 	rk3399-roc-pc.dtb \
 	rk3399-roc-pc-mezzanine.dtb \
 	rk3399-rock-pi-4a.dtb \
@@ -162,7 +163,11 @@ dtb-$(CONFIG_ROCKCHIP_RK3399) += \
 	rk3399-rock-pi-4c.dtb \
 	rk3399-rock960.dtb \
 	rk3399-rockpro64.dtb \
-	rk3399pro-rock-pi-n10.dtb
+	rk3399pro-rock-pi-n10.dtb \
+	rk3399-tb-ls3399.dtb \
+	rk3399-tpm312.dtb \
+	rk3399-xiaobao-nas.dtb \
+	rk3399-zysj.dtb
 
 dtb-$(CONFIG_ROCKCHIP_RK3568) += \
 	rk3568-evb.dtb
